@@ -1,0 +1,112 @@
+#! /usr/bin/perl
+
+sub readprops($)
+{
+	my ($file) = @_;
+	
+	open(PROP,$file);
+	while (<PROP>)
+	{
+		chop;
+		if (m/^([^#].*?)=(.*)$/)
+		{
+			$property{$1}=$2;
+		}
+	}
+	close(PROP);
+	return %property;
+}
+
+sub compile($$%)
+{
+	my ($roast, $revision, $extprops) = @_;
+
+	$result=system "ant -Dextension.revision=$revision -propertyfile ../roaster.properties -logger org.apache.tools.ant.listener.MailLogger \"-DMailLogger.failure.subject=Build Failure - $roast\" \"-DMailLogger.success.subject=Build Success - $roast\" -f build/build.xml clean package >/dev/null 2>/dev/null";
+	if ($result==0)
+	{
+		print "build successful.\n";
+		system "svn log --xml --limit 10 >".$options{"outputdir"}."/".$$extprops{'name'}.".log";
+	}
+	else
+	{
+		print "build failed.\n";
+	}
+}
+
+sub outputinfo($$%)
+{
+	my ($roast, $revision, $extprops) = @_;
+
+	open(INFO,">".$options{"outputdir"}."/".$$extprops{'name'}.".properties");
+	print INFO "version=".$$extprops{'version'}."\n";
+	print INFO "revision=".$revision."\n";
+	close(INFO);
+}
+
+sub roast($)
+{
+	my ($roast) = @_;
+
+	print "Roasting $roast...";
+	chdir $roast;
+	
+	my %extprops = readprops("extension.properties");
+	my $svn=`svn update`;
+	if ($svn =~ m/Updated to revision (\d+)\./)
+	{
+		print "updating to revision $1...";
+		compile($roast,$1,\%extprops);
+		outputinfo($roast,$1,\%extprops);
+	}
+	elsif (($svn =~ m/At revision (\d+)\./)&&($force==1))
+	{
+		print "rebuilding from revision $1...";
+		compile($roast,$1,\%extprops);
+		outputinfo($roast,$1,\%extprops);
+	}
+	else
+	{
+		print "up to date.\n";
+	}
+	chdir "..";
+}
+
+%options=readprops("roaster.properties");
+
+$force=0;
+for ($pos=0; $pos<=$#ARGV; $pos++)
+{
+	$arg=$ARGV[$pos];
+	if (($arg eq "-f")||($arg eq "--force"))
+	{
+		$force=1;
+	}
+	elsif (-d $arg)
+	{
+		$roasts[$#roasts+1]=$arg;
+	}
+	else
+	{
+		print "Invalid command line argument: $arg\n";
+		exit;
+	}
+}
+
+if ($#roasts>=0)
+{
+	for ($pos=0; $pos<=$#roasts; $pos++)
+	{
+		roast($roasts[$pos]);
+	}
+}
+else
+{
+	opendir(ROASTS,".");
+	while ($roast=readdir(ROASTS))
+	{
+		if ((-d $roast)&& !($roast =~ m/^\./))
+		{
+			roast($roast);
+		}
+	}
+}
