@@ -21,7 +21,7 @@ sub compile($$%)
 {
 	my ($roast, $revision, $extprops) = @_;
 
-	$result=system "ant -Dextension.revision=$revision -propertyfile ../roaster.properties -logger org.apache.tools.ant.listener.MailLogger \"-DMailLogger.failure.subject=Build Failure - $roast\" \"-DMailLogger.success.subject=Build Success - $roast\" -f build/build.xml clean package >/dev/null 2>/dev/null";
+	$result=system "ant -Dextension.revision=$revision -propertyfile ../roaster.properties -logger org.apache.tools.ant.listener.MailLogger \"-DMailLogger.failure.subject=Build Failure - $roast\" \"-DMailLogger.success.subject=Build Success - $roast\" -f build/build.xml clean revision-package >/dev/null 2>/dev/null";
 	if ($result==0)
 	{
 		print "build successful.\n";
@@ -72,6 +72,8 @@ sub roast($)
 }
 
 %options=readprops("roaster.properties");
+
+chdir $options{'roastdir'};
 
 $force=0;
 for ($pos=0; $pos<=$#ARGV; $pos++)
