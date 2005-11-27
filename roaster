@@ -43,15 +43,23 @@ sub outputinfo($$%)
 	close(INFO);
 }
 
-sub roast($)
+sub roast($$)
 {
-	my ($roast) = @_;
+	my ($roast,$revision) = @_;
 
 	print "Roasting $roast...";
 	chdir $roast;
 	
 	my %extprops = readprops("extension.properties");
-	my $svn=`svn update`;
+	my $svn="";
+	if ($revision>0)
+	{
+		$svn = qx/svn update -r $revision/;
+	}
+	else
+	{
+		$svn = qx/svn update/;
+	}
 	if ($svn =~ m/Updated to revision (\d+)\./)
 	{
 		print "updating to revision $1...";
@@ -76,12 +84,18 @@ sub roast($)
 chdir $options{'roastdir'};
 
 $force=0;
+$revision=-1;
 for ($pos=0; $pos<=$#ARGV; $pos++)
 {
 	$arg=$ARGV[$pos];
 	if (($arg eq "-f")||($arg eq "--force"))
 	{
 		$force=1;
+	}
+	elsif ($arg eq "-r")
+	{
+		$pos++;
+		$revision=$ARGV[$pos];
 	}
 	elsif (-d $arg)
 	{
@@ -98,7 +112,7 @@ if ($#roasts>=0)
 {
 	for ($pos=0; $pos<=$#roasts; $pos++)
 	{
-		roast($roasts[$pos]);
+		roast($roasts[$pos],$revision);
 	}
 }
 else
@@ -108,7 +122,7 @@ else
 	{
 		if ((-d $roast)&& !($roast =~ m/^\./))
 		{
-			roast($roast);
+			roast($roast,$revision);
 		}
 	}
 }
