@@ -17,15 +17,26 @@ sub readprops($)
 	return %property;
 }
 
-sub compile($$%)
+sub compile($$$%)
 {
-	my ($roast, $revision, $extprops) = @_;
+	my ($roast, $revision, $release, $extprops) = @_;
 
-	$result=system "ant -Dextension.revision=$revision -propertyfile ../roaster.properties -logger org.apache.tools.ant.listener.MailLogger \"-DMailLogger.failure.subject=Build Failure - $roast\" \"-DMailLogger.success.subject=Build Success - $roast\" -f build/build.xml clean revision-package >/dev/null 2>/dev/null";
+	$target=$options{"outputdir"};
+	if ($release>0)
+	{
+		$result=system "ant -Drelease=true -propertyfile ../roaster.properties -f build/build.xml clean package >/dev/null 2>/dev/null";
+	}
+	else
+	{
+		$result=system "ant -Dextension.revision=$revision -propertyfile ../roaster.properties -logger org.apache.tools.ant.listener.MailLogger \"-DMailLogger.failure.subject=Build Failure - $roast\" \"-DMailLogger.success.subject=Build Success - $roast\" -f build/build.xml clean revision-package >/dev/null 2>/dev/null";
+	}
 	if ($result==0)
 	{
 		print "build successful.\n";
-		system "svn log --xml --limit 10 >".$options{"outputdir"}."/".$$extprops{'name'}.".log";
+		if ($release==0)
+		{
+			system "svn log --xml --limit 10 >".$options{"outputdir"}."/".$$extprops{'name'}.".log";
+		}
 	}
 	else
 	{
@@ -43,15 +54,16 @@ sub outputinfo($$%)
 	close(INFO);
 }
 
-sub roast($$)
+sub roast($$$)
 {
-	my ($roast,$revision) = @_;
+	my ($roast,$revision,$release) = @_;
 
 	print "Roasting $roast...";
 	chdir $roast;
 	
-	my %extprops = readprops("extension.properties");
 	my $svn="";
+	$svn = qx/svn cleanup/;
+	$svn = qx/svn cleanup build/;
 	if ($revision>0)
 	{
 		$svn = qx/svn update -r $revision/;
@@ -60,17 +72,24 @@ sub roast($$)
 	{
 		$svn = qx/svn update/;
 	}
+	my %extprops = readprops("extension.properties");
 	if ($svn =~ m/Updated to revision (\d+)\./)
 	{
 		print "updating to revision $1...";
-		compile($roast,$1,\%extprops);
-		outputinfo($roast,$1,\%extprops);
+		compile($roast,$1,$release,\%extprops);
+		if ($release==0)
+		{
+			outputinfo($roast,$1,\%extprops);
+		}
 	}
 	elsif (($svn =~ m/At revision (\d+)\./)&&($force==1))
 	{
 		print "rebuilding from revision $1...";
-		compile($roast,$1,\%extprops);
-		outputinfo($roast,$1,\%extprops);
+		compile($roast,$1,$release,\%extprops);
+		if ($release==0)
+		{
+			outputinfo($roast,$1,\%extprops);
+		}
 	}
 	else
 	{
@@ -85,6 +104,7 @@ chdir $options{'roastdir'};
 
 $force=0;
 $revision=-1;
+$release=0;
 for ($pos=0; $pos<=$#ARGV; $pos++)
 {
 	$arg=$ARGV[$pos];
@@ -96,6 +116,11 @@ for ($pos=0; $pos<=$#ARGV; $pos++)
 	{
 		$pos++;
 		$revision=$ARGV[$pos];
+	}
+	elsif ($arg eq "-release")
+	{
+		$force=1;
+		$release=1;
 	}
 	elsif (-d $arg)
 	{
@@ -112,7 +137,7 @@ if ($#roasts>=0)
 {
 	for ($pos=0; $pos<=$#roasts; $pos++)
 	{
-		roast($roasts[$pos],$revision);
+		roast($roasts[$pos],$revision,$release);
 	}
 }
 else
@@ -122,7 +147,7 @@ else
 	{
 		if ((-d $roast)&& !($roast =~ m/^\./))
 		{
-			roast($roast,$revision);
+			roast($roast,$revision,$release);
 		}
 	}
 }
