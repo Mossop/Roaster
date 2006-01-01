@@ -1,5 +1,7 @@
 #! /usr/bin/perl
 
+use File::Copy;
+
 sub readprops($)
 {
 	my ($file) = @_;
@@ -21,21 +23,39 @@ sub compile($$$%)
 {
 	my ($roast, $revision, $release, $extprops) = @_;
 
-	$target=$options{"outputdir"};
-	if ($release>0)
+	$props="";
+	$logger="";
+	if (exists $$extprops{'branch'})
 	{
-		$result=system "ant -Drelease=true -propertyfile ../roaster.properties -f build/build.xml clean package >/dev/null 2>/dev/null";
+		$$extprops{'branchname'}=$$extprops{'name'}.'-'.$$extprops{'branch'};
 	}
 	else
 	{
-		$result=system "ant -Dextension.revision=$revision -propertyfile ../roaster.properties -logger org.apache.tools.ant.listener.MailLogger \"-DMailLogger.failure.subject=Build Failure - $roast\" \"-DMailLogger.success.subject=Build Success - $roast\" -f build/build.xml clean revision-package >/dev/null 2>/dev/null";
+		$$extprops{'branchname'}=$$extprops{'name'};
 	}
+	if ($release>0)
+	{
+		$props.=" -Doutputdir=".$options{'releasedir'}."/".$$extprops{'name'};
+		$props.=" -Drelease=true";
+	}
+	else
+	{
+		$props.=" -Doutputdir=".$options{'outputdir'}."/".$$extprops{'branchname'};
+		$props.=" -Dextension.revision=rev$revision";
+		$logger.=" -logger org.apache.tools.ant.listener.MailLogger";
+		$logger.=" \"-DMailLogger.failure.subject=Build Failure - $roast\"";
+		$logger.=" \"-DMailLogger.success.subject=Build Success - $roast\"";
+	}
+	$result=system "ant".$props." -propertyfile ../ant.properties".$logger." -f build/build.xml clean package >/dev/null 2>/dev/null";
 	if ($result==0)
 	{
 		print "build successful.\n";
 		if ($release==0)
 		{
-			system "svn log --xml --limit 10 >".$options{"outputdir"}."/".$$extprops{'name'}.".log";
+			system "svn log --xml --limit 10 >".$options{"outputdir"}."/".$$extprops{'branchname'}."/".$$extprops{'name'}.".log";
+			$source=$options{"outputdir"}."/".$$extprops{'branchname'}."/".$$extprops{'name'}.".xpi";
+			$target=$options{'revisiondir'}."/".$$extprops{'branchname'}."/".$$extprops{'name'}."-".$$extprops{'version'}.".rev".$revision.".xpi";
+			copy($source,$target);
 		}
 	}
 	else
@@ -48,9 +68,14 @@ sub outputinfo($$%)
 {
 	my ($roast, $revision, $extprops) = @_;
 
-	open(INFO,">".$options{"outputdir"}."/".$$extprops{'name'}.".properties");
+	open(INFO,">".$options{"outputdir"}."/".$$extprops{'branchname'}."/".$$extprops{'branchname'}.".properties");
+	print INFO "name=".$$extprops{'name'}."\n";
 	print INFO "version=".$$extprops{'version'}."\n";
 	print INFO "revision=".$revision."\n";
+	if (exists $$extprops{'branch'})
+	{
+		print INFO "branch=".$$extprops{'branch'}."\n";
+	}
 	close(INFO);
 }
 
