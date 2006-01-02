@@ -5,7 +5,8 @@ use File::Copy;
 sub readprops($)
 {
 	my ($file) = @_;
-	
+
+	my %property;
 	open(PROP,$file);
 	while (<PROP>)
 	{
@@ -33,7 +34,9 @@ sub compile($$$%)
 	{
 		$$extprops{'branchname'}=$$extprops{'name'};
 	}
-	if ($release>0)
+	$props.=" -Droast=$roast";
+	$props.=" -Dproperties=../ant.properties";
+	if ($release)
 	{
 		$props.=" -Doutputdir=".$options{'releasedir'}."/".$$extprops{'name'};
 		$props.=" -Drelease=true";
@@ -43,11 +46,9 @@ sub compile($$$%)
 		$props.=" -Doutputdir=".$options{'outputdir'}."/".$$extprops{'branchname'};
 		$props.=" -Dextension.revision=rev$revision";
 		$logger.=" -logger org.apache.tools.ant.listener.MailLogger";
-		$logger.=" \"-DMailLogger.failure.subject=Build Failure - $roast\"";
-		$logger.=" \"-DMailLogger.success.subject=Build Success - $roast\"";
 	}
-	$result=system "ant -v -d".$props." -propertyfile ../ant.properties".$logger." -f build/build.xml clean package >/dev/null 2>/dev/null";
-	if ($result==0)
+	$result=system "ant -v".$props.$logger." -f build/build.xml clean-package >/dev/null 2>/dev/null";
+	if (!$result)
 	{
 		print "build successful.\n";
 		if ($release==0)
@@ -57,10 +58,12 @@ sub compile($$$%)
 			$target=$options{'revisiondir'}."/".$$extprops{'branchname'}."/".$$extprops{'name'}."-".$$extprops{'version'}.".rev".$revision.".xpi";
 			copy($source,$target);
 		}
+		return 1;
 	}
 	else
 	{
 		print "build failed.\n";
+		return 0;
 	}
 }
 
@@ -89,7 +92,7 @@ sub roast($$$)
 	my $svn="";
 	$svn = qx/svn cleanup/;
 	$svn = qx/svn cleanup build/;
-	if ($revision>0)
+	if ($revision)
 	{
 		$svn = qx/svn update -r $revision/;
 	}
@@ -101,8 +104,7 @@ sub roast($$$)
 	if ($svn =~ m/Updated to revision (\d+)\./)
 	{
 		print "updating to revision $1...";
-		compile($roast,$1,$release,\%extprops);
-		if ($release==0)
+		if ((compile($roast,$1,$release,\%extprops))&&(!$release))
 		{
 			outputinfo($roast,$1,\%extprops);
 		}
@@ -110,8 +112,7 @@ sub roast($$$)
 	elsif (($svn =~ m/At revision (\d+)\./)&&($force==1))
 	{
 		print "rebuilding from revision $1...";
-		compile($roast,$1,$release,\%extprops);
-		if ($release==0)
+		if ((compile($roast,$1,$release,\%extprops))&&(!$release))
 		{
 			outputinfo($roast,$1,\%extprops);
 		}
@@ -130,7 +131,7 @@ chdir $options{'roastdir'};
 mkdir "roast.lock" or die "Could not obtain lock.";
 
 $force=0;
-$revision=-1;
+$revision=0;
 $release=0;
 for ($pos=0; $pos<=$#ARGV; $pos++)
 {
