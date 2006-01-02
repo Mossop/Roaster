@@ -46,7 +46,7 @@ sub compile($$$%)
 		$logger.=" \"-DMailLogger.failure.subject=Build Failure - $roast\"";
 		$logger.=" \"-DMailLogger.success.subject=Build Success - $roast\"";
 	}
-	$result=system "ant".$props." -propertyfile ../ant.properties".$logger." -f build/build.xml clean package >/dev/null 2>/dev/null";
+	$result=system "ant -v -d".$props." -propertyfile ../ant.properties".$logger." -f build/build.xml clean package >/dev/null 2>/dev/null";
 	if ($result==0)
 	{
 		print "build successful.\n";
@@ -127,6 +127,8 @@ sub roast($$$)
 
 chdir $options{'roastdir'};
 
+mkdir "roast.lock" or die "Could not obtain lock.";
+
 $force=0;
 $revision=-1;
 $release=0;
@@ -170,9 +172,11 @@ else
 	opendir(ROASTS,".");
 	while ($roast=readdir(ROASTS))
 	{
-		if ((-d $roast)&& !($roast =~ m/^\./))
+		if ((-d $roast)&& !($roast =~ m/^\./)&&($roast ne "roast.lock"))
 		{
 			roast($roast,$revision,$release);
 		}
 	}
 }
+
+rmdir "roast.lock";
