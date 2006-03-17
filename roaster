@@ -53,7 +53,7 @@ sub compile($$$%)
 		print "build successful.\n";
 		if ($release==0)
 		{
-			system "svn log --xml --limit 10 >".$options{"outputdir"}."/".$$extprops{'branchname'}."/".$$extprops{'name'}.".log";
+			#system "svn log --xml --limit 10 >".$options{"outputdir"}."/".$$extprops{'branchname'}."/".$$extprops{'name'}.".log";
 			$source=$options{"outputdir"}."/".$$extprops{'branchname'}."/".$$extprops{'name'}.".xpi";
 			$target=$options{'revisiondir'}."/".$$extprops{'branchname'}."/".$$extprops{'name'}."-".$$extprops{'version'}.".rev".$revision.".xpi";
 			copy($source,$target);
@@ -75,6 +75,11 @@ sub outputinfo($$%)
 	print INFO "name=".$$extprops{'name'}."\n";
 	print INFO "version=".$$extprops{'version'}."\n";
 	print INFO "revision=".$revision."\n";
+	$info = qx/svn info ./;
+	if ($info =~ m/URL: .*\/dave(\/\S*)/)
+	{
+		print INFO "repository=".$1."\n";
+	}
 	if (exists $$extprops{'branch'})
 	{
 		print INFO "branch=".$$extprops{'branch'}."\n";
