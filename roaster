@@ -133,8 +133,6 @@ sub roast($$$)
 
 chdir $options{'roastdir'};
 
-mkdir "roast.lock" or die "Could not obtain lock.";
-
 $force=0;
 $revision=0;
 $release=0;
@@ -165,6 +163,8 @@ for ($pos=0; $pos<=$#ARGV; $pos++)
 		exit;
 	}
 }
+
+mkdir "roast.lock" or die "Could not obtain lock.";
 
 if ($#roasts>=0)
 {
