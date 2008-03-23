@@ -37,7 +37,6 @@ def changeRevision(ctx, dir, revision):
     rev = getSVNHeadRevision()
   newrev = svn.client.update(path, rev, True, ctx)
   if entry.revision != newrev:
-    print "  Updated to revision", newrev
     return True
   return False
 
@@ -78,7 +77,6 @@ def build(dir, release, outputdir):
     builder.init()
     if outputdir:
       builder.outputdir = outputdir.replace("${name}", builder.settings['name'])
-    print "  Building to " + builder.outputdir
     builder.clean()
     builder.build()
     builder.package()
@@ -104,6 +102,8 @@ def main():
                     help="create release builds with no build identifier")
   parser.add_option("-b", "--basedir", default = None,
                     help="set the base directory of the items")
+  parser.add_option("-q", "--quiet", action="store_true", default = False,
+                    help="Only display messages when something happens")
   (options, items) = parser.parse_args()
 
   if options.basedir:
@@ -152,12 +152,13 @@ def main():
   try:
     ctx = createSVNContext()
     for dir in roasts:
-      print "Roasting " + dir
       if options.revision or options.update:
         if ((not changeRevision(ctx, dir, options.revision)) and
            (not options.force)):
-          print "  No change, skipping"
+          if not options.quiet:
+            print "Skipping " + dir + ", No change"
           continue
+      print "Roasting " + dir
       build(dir, options.release, outputdir)
   finally:
     os.rmdir(os.path.join(basedir, "roast.lock"))
