@@ -66,7 +66,7 @@ def getDirs(basedir, dirs, versioned = False):
 def build(dir, release, outputdir):
   sys.path.append(os.path.join(dir, "build"))
   xpibuild = __import__("xpibuild")
-  builder = xpibuild.XPIBuilder()
+  builder = xpibuild.XPIBuilder(dir)
   builder.release = True
   if not release:
     revision = getRevision(dir)
