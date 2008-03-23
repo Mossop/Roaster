@@ -65,13 +65,13 @@ def getDirs(basedir, dirs, versioned = False):
   return results
 
 def build(dir, release, outputdir):
-  revision = getRevision(dir)
   sys.path.append(os.path.join(dir, "build"))
   xpibuild = __import__("xpibuild")
   builder = xpibuild.XPIBuilder()
   builder.release = True
   if not release:
-    builder.buildid = "r" + str(revision)
+    revision = getRevision(dir)
+    builder.buildid = "rev" + str(revision)
 
   print "  Building..."
   try:
