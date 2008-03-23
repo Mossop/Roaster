@@ -1,25 +1,42 @@
-import os, ConfigParser, pysvn, sys
+import os, ConfigParser, sys, svn.core, svn.client, svn.wc
 
-def changeRevision(dir, revision):
-  client = pysvn.Client()
-  current = client.info(dir)
-  if (revision) and (current.revision.number == int(revision)):
+def createSVNContext():
+  ctx = svn.client.svn_client_ctx_t()
+  providers = []
+  providers.append(svn.client.get_simple_provider())
+  providers.append(svn.client.get_username_provider())
+  providers.append(svn.client.get_ssl_server_trust_file_provider())
+  providers.append(svn.client.get_ssl_client_cert_file_provider())
+  providers.append(svn.client.get_ssl_client_cert_pw_file_provider())
+  ctx.auth_baton = svn.core.svn_auth_open(providers)
+  ctx.config = svn.core.svn_config_get_config(None)
+  return ctx
+
+def changeRevision(ctx, dir, revision):
+  path = svn.core.svn_path_canonicalize(dir)
+  adm_access = svn.wc.adm_probe_open(None, path, False, False)
+  entry = svn.wc.entry(path, adm_access, False)
+  if (revision) and (entry.revision == int(revision)):
     return False
+  rev = svn.core.svn_opt_revision_t()
   if revision:
-    rev = pysvn.Revision(pysvn.opt_revision_kind.number, revision)
+    rev.kind = svn.core.svn_opt_revision_number
+    rev.value = svn.core.svn_opt_revision_value_t()
+    rev.value.number = int(revision)
   else:
-    rev = pysvn.Revision(pysvn.opt_revision_kind.head)
-  newrev = client.update(dir, revision=rev)
-  if current.revision.number != newrev[0].number:
-    print "  Updated to revision", newrev[0].number
+    rev.kind = svn.core.svn_opt_revision_head
+  newrev = svn.client.update(path, rev, True, ctx)
+  if entry.revision != newrev:
+    print "  Updated to revision", newrev
     return True
   return False
 
 def getRevision(dir):
   if os.path.isdir(os.path.join(dir, ".svn")):
-    client = pysvn.Client()
-    current = client.info(dir)
-    return current.revision.number
+    path = svn.core.svn_path_canonicalize(dir)
+    adm_access = svn.wc.adm_probe_open(None, path, False, False)
+    entry = svn.wc.entry(path, adm_access, False)
+    return entry.revision
   return None
 
 def getDirs(basedir, dirs, versioned = False):
@@ -123,10 +140,11 @@ def main():
 
   os.mkdir(os.path.join(basedir, "roast.lock"))
   try:
+    ctx = createSVNContext()
     for dir in roasts:
       print "Roasting " + dir
       if options.revision or options.update:
-        if ((not changeRevision(dir, options.revision)) and
+        if ((not changeRevision(ctx, dir, options.revision)) and
            (not options.force)):
           print "  No change, skipping"
           continue
