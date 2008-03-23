@@ -12,19 +12,29 @@ def createSVNContext():
   ctx.config = svn.core.svn_config_get_config(None)
   return ctx
 
+def getSVNRevision(num):
+  value = svn.core.svn_opt_revision_value_t()
+  value.number = num
+  revision = svn.core.svn_opt_revision_t()
+  revision.kind = svn.core.svn_opt_revision_number
+  revision.value = value
+  return revision
+
+def getSVNHeadRevision():
+  revision = svn.core.svn_opt_revision_t()
+  revision.kind = svn.core.svn_opt_revision_head
+  return revision
+
 def changeRevision(ctx, dir, revision):
   path = svn.core.svn_path_canonicalize(dir)
   adm_access = svn.wc.adm_probe_open(None, path, False, False)
   entry = svn.wc.entry(path, adm_access, False)
   if (revision) and (entry.revision == int(revision)):
     return False
-  rev = svn.core.svn_opt_revision_t()
   if revision:
-    rev.kind = svn.core.svn_opt_revision_number
-    rev.value = svn.core.svn_opt_revision_value_t()
-    rev.value.number = int(revision)
+    rev = getSVNRevision(int(revision))
   else:
-    rev.kind = svn.core.svn_opt_revision_head
+    rev = getSVNHeadRevision()
   newrev = svn.client.update(path, rev, True, ctx)
   if entry.revision != newrev:
     print "  Updated to revision", newrev
